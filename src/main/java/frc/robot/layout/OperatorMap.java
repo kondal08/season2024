@@ -127,56 +127,6 @@ public abstract class OperatorMap extends CommandMap {
             getClimberLowerButton().onFalse(Climber.getInstance().run(() -> -0.0));
         }
     }
-
-    private void registerComplexCommands() {
-        if (Config.Subsystems.INTAKE_ENABLED && Config.Subsystems.FEEDER_ENABLED) {
-            getIntakeButton().whileTrue(new IntakeUntilLoadedCommand());
-        }
-
-        if (Config.Subsystems.CLIMBER_ENABLED && Config.Subsystems.PIVOT_ENABLED) {
-            var pivot = Pivot.getInstance();
-            var climber = Climber.getInstance();
-
-            getClimbSequenceButton().whileTrue(pivot.updatePosition(() -> PivotMap.PIVOT_AMP_ANGLE).andThen(climber.run(() -> 0.3)));
-            getClimbSequenceButton().onFalse(climber.run(() -> -0.3));
-        }
-
-        if (Config.Subsystems.SHOOTER_ENABLED && Config.Subsystems.INTAKE_ENABLED && Config.Subsystems.DRIVETRAIN_ENABLED && Config.Subsystems.PIVOT_ENABLED) {
-            Shooter shooter = Shooter.getInstance();
-            Pivot pivot = Pivot.getInstance();
-            FlywheelLookupTable lookupTable = FlywheelLookupTable.getInstance();
-
-            // if alliance isn't populating default to red to avoid null pointer
-            Supplier<Pose2d> target = () -> DriverStation.getAlliance().isPresent() && (DriverStation.getAlliance().get() == DriverStation.Alliance.Blue) ? Coordinates.BLUE_SPEAKER : Coordinates.RED_SPEAKER;
-
-            PoseEstimator poseEstimator = PoseEstimator.getInstance();
-
-            // getShootSpeakerButton().onTrue(new ShootSequenceCommand());
-
-            Supplier<ActionSetpoint> getActionSetpoint = () -> lookupTable.get(poseEstimator.getDistanceToPose(target.get().getTranslation()));
-
-            getArcButton().whileTrue(
-                    pivot.updatePosition(() -> getActionSetpoint.get().getAngle())
-                            .alongWith(
-                                    shooter.setFlywheelVelocityCommand(() -> getActionSetpoint.get().getRPM())
-                            ));
-
-            getArcButton().onFalse(shooter.setFlywheelVelocityCommand(() -> 0.0).alongWith(pivot.updatePosition(() -> -1.0)));
-
-            getAmpAlignButton().onTrue(
-                    pivot.updatePosition(() -> PivotMap.PIVOT_AMP_ANGLE)
-                            .alongWith(shooter.setFlywheelVelocityCommand(() -> ShooterMap.AMP_SPEED)));
-
-            getAmpAlignButton().onFalse(shooter.setFlywheelVelocityCommand(() -> 0.0).alongWith(pivot.updatePosition(() -> -1.0)));
-
-            getStageAlignButton().onTrue(pivot.updatePosition(() -> PivotMap.PIVOT_TRAP_ANGLE).alongWith(shooter.setFlywheelVelocityCommand(() -> ShooterMap.TRAP_SPEED)));
-            getStageAlignButton().onFalse(shooter.setFlywheelVelocityCommand(() -> 0.0).alongWith(pivot.updatePosition(() -> -1.0)));
-
-            // getEjectButton().whileTrue(new InstantCommand(() -> feeder.setFeederState(FeederDirection.REVERSE)).alongWith(intake.se));
-        }
-
-    }
-
     private void registerPivot() {
         if (Config.Subsystems.PIVOT_ENABLED) {
             Pivot pivot = Pivot.getInstance();
@@ -184,6 +134,60 @@ public abstract class OperatorMap extends CommandMap {
             getPivotRaiseButton().onTrue(pivot.updatePosition(() -> (PivotMap.PIVOT_AMP_ANGLE + 40.0)));
             getPivotLowerButton().onTrue(pivot.updatePosition(() -> -1.0));
         }
+  }
+
+  private void registerComplexCommands(){
+    if (Config.Subsystems.SHOOTER_ENABLED && Config.Subsystems.Intake.INTAKE_ENABLED
+        && Config.Subsystems.DRIVETRAIN_ENABLED) {
+        Shooter shooter = Shooter.getInstance();
+         Pivot pivot = Pivot.getInstance();
+      FlywheelLookupTable lookupTable = FlywheelLookupTable.getInstance();
+      Feeder feeder = Feeder.getInstance();
+      // Pose2d target = (DriverStation.getAlliance().get() == DriverStation.Alliance.Blue) ? Coordinates.BLUE_SPEAKER : Coordinates.RED_SPEAKER;
+       Pose2d target = (Config.IS_ALLIANCE_BLUE) ? Coordinates.BLUE_SPEAKER : Coordinates.RED_SPEAKER;
+      PoseEstimator poseEstimator = PoseEstimator.getInstance();
+      Intake intake = Intake.getInstance();
+      // getShootSpeakerButton().onTrue(new ShootSequenceCommand());
+      // getIntakeButton().onTrue(new RunCommand(() -> intake.setIntakeState(IntakeDirection.FORWARD), intake));
+      //   getIntakeButton().onTrue(new RunCommand(() -> intake.setIntakeState(IntakeDirection.STOPPED), intake));
+      getIntakeButton().onTrue(new IntakeUntilLoadedCommand());
+      getArcButton().whileTrue((pivot.updatePosition(() -> lookupTable
+              .get(poseEstimator.getDistanceToPose(Shooter.getInstance().findIdealTarget(() -> Drivetrain.getInstance().getPose(),
+                      () -> Drivetrain.getInstance().getFieldRelativeSpeed(),
+                      () -> Drivetrain.getInstance().getFieldRelativeAccel()).getTranslation())).getAngleSetpoint()).alongWith(
+              shooter.setFlywheelVelocityCommand(() -> lookupTable.get(
+                      poseEstimator.getDistanceToPose(Shooter.getInstance().findIdealTarget(() -> Drivetrain.getInstance().getPose(),
+                              () -> Drivetrain.getInstance().getFieldRelativeSpeed(),
+                              () -> Drivetrain.getInstance().getFieldRelativeAccel()).getTranslation())).getRPM()))));
+      getArcButton().onFalse(shooter.setFlywheelVelocityCommand(() -> 0.0).alongWith(pivot.updatePosition(() -> -1.0)));
+
+      getAmpAlignButton().onTrue(
+        pivot.updatePosition(() -> PivotMap.PIVOT_AMP_ANGLE).alongWith(
+        shooter.setFlywheelVelocityCommand(() -> ShooterMap.AMP_SPEED)));
+      getAmpAlignButton().onFalse(
+        shooter.setFlywheelVelocityCommand(() -> 0.0).alongWith(
+        pivot.updatePosition(() -> -1.0)
+        ));
+      getStageAlignButton().onTrue(
+        pivot.updatePosition(() -> PivotMap.PIVOT_TRAP_ANGLE).alongWith(
+        shooter.setFlywheelVelocityCommand(() -> ShooterMap.TRAP_SPEED)));
+      getStageAlignButton().onFalse(
+        shooter.setFlywheelVelocityCommand(() -> 0.0).alongWith(
+        pivot.updatePosition(() -> -1.0)
+        ));
+
+      getClimbSequenceButton().whileTrue(
+          pivot.updatePosition(() -> PivotMap.PIVOT_AMP_ANGLE).andThen(
+          Climber.getInstance().run(() -> 0.3))); 
+      getClimbSequenceButton().onFalse(Climber.getInstance().run(() -> -0.3));
+
+      getPivotRaiseButton().onTrue(pivot.updatePosition(() -> (PivotMap.PIVOT_AMP_ANGLE +40.0)));
+      getPivotLowerButton().onTrue(pivot.updatePosition(() -> -1.0));
+      getClimberRaiseButton().whileTrue(Climber.getInstance().run(() -> 0.3));
+      getClimberRaiseButton().onFalse(Climber.getInstance().run(() -> -0.0));
+       getClimberLowerButton().whileTrue(Climber.getInstance().run(() -> -0.3));
+      getClimberLowerButton().onFalse(Climber.getInstance().run(() -> -0.0));
+      // getEjectButton().whileTrue(new InstantCommand(() -> feeder.setFeederState(FeederDirection.REVERSE)).alongWith(intake.se));
     }
 
 

@@ -8,6 +8,7 @@ import frc.robot.RobotMap.Coordinates;
 import frc.robot.core.util.controllers.CommandMap;
 import frc.robot.core.util.controllers.GameController;
 import frc.robot.subsystems.Drivetrain;
+import frc.robot.subsystems.Shooter;
 import frc.robot.subsystems.Vision.Vision;
 
 import java.util.function.Supplier;
@@ -51,13 +52,20 @@ public abstract class DriverMap extends CommandMap {
             //--- Drive ---
             drivetrain.setDefaultCommand(drivetrain.driveCommand(this::getSwerveXSpeed, this::getSwerveYSpeed, this::getSwerveRot));
 
-            //--- Arcing ---
-
-            // defaults to red speaker to avoid null pointer exception
-            Supplier<Translation2d> getTarget = () -> DriverStation.getAlliance().isPresent() && DriverStation.getAlliance().get() == DriverStation.Alliance.Blue
-                    ? Coordinates.BLUE_SPEAKER.getTranslation()
-                    : Coordinates.RED_SPEAKER.getTranslation();
-
+      //--- Arcing ---
+      // if(DriverStation.getAlliance().get() == DriverStation.Alliance.Red){
+      //   getArcingButton().whileTrue(drivetrain.alignWhileDrivingCommand(
+      //         this::getSwerveXSpeed,this::getSwerveYSpeed, () -> Coordinates.RED_SPEAKER.getTranslation()));
+      // }
+      // else{
+      //   getArcingButton().whileTrue(drivetrain.alignWhileDrivingCommand(
+      //         this::getSwerveXSpeed,this::getSwerveYSpeed, () -> Coordinates.BLUE_SPEAKER.getTranslation()));
+      // }
+      getArcingButton().whileTrue(drivetrain.alignWhileDrivingCommand(
+              this::getSwerveXSpeed,this::getSwerveYSpeed, () -> Shooter.getInstance().findIdealTarget(
+                      () -> Drivetrain.getInstance().getPose(),
+                      () -> Drivetrain.getInstance().getFieldRelativeSpeed(),
+                      () -> Drivetrain.getInstance().getFieldRelativeAccel()).getTranslation()));
             getArcingButton().whileTrue(drivetrain.alignWhileDrivingCommand(this::getSwerveXSpeed, this::getSwerveYSpeed, getTarget));
 
             // getNavigateAndAllignAmpButton().whileTrue(drivetrain.pathFindThenFollowPathCommand(
