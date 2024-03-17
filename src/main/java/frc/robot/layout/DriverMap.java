@@ -1,5 +1,7 @@
 package frc.robot.layout;
 
+import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 import frc.robot.Config;
 import frc.robot.RobotMap.Coordinates;
@@ -9,45 +11,46 @@ import frc.robot.subsystems.Drivetrain;
 import frc.robot.subsystems.Shooter;
 import frc.robot.subsystems.Vision.Vision;
 
+import java.util.function.Supplier;
+
 public abstract class DriverMap extends CommandMap {
 
-  public DriverMap(GameController controller) {
-    super(controller);
-  }
+    public DriverMap(GameController controller) {
+        super(controller);
+    }
 
 
-  abstract double getSwerveXSpeed();
+    abstract double getSwerveXSpeed();
 
-  abstract double getSwerveYSpeed();
+    abstract double getSwerveYSpeed();
 
-  abstract double getSwerveRot();
+    abstract double getSwerveRot();
 
-  abstract JoystickButton getSlowModeToggleButton();
-  
-  abstract JoystickButton getArcingButton();
+    abstract JoystickButton getSlowModeToggleButton();
 
-  abstract JoystickButton getTestButton();
+    abstract JoystickButton getArcingButton();
 
-  abstract JoystickButton getFollowAprilTagButton();
+    abstract JoystickButton getTestButton();
 
-  abstract JoystickButton getFollowNoteButton();
+    abstract JoystickButton getFollowAprilTagButton();
 
-  abstract JoystickButton getZeroGyroButton();
+    abstract JoystickButton getFollowNoteButton();
 
-  abstract JoystickButton getNavigateAndAllignAmpButton();
+    abstract JoystickButton getZeroGyroButton();
 
-  abstract JoystickButton getNavigateAndAllignStageButton();
+    abstract JoystickButton getNavigateAndAllignAmpButton();
 
-  private void registerDrivetrain() {
-    if (Config.Subsystems.DRIVETRAIN_ENABLED) {
-      System.out.println("Register Drivetrain");
-      var drivetrain = Drivetrain.getInstance();
-      var vision = Vision.getInstance();
+    abstract JoystickButton getNavigateAndAllignStageButton();
 
-      //--- Drive --- 
-      drivetrain.setDefaultCommand(
-      drivetrain.driveCommand(
-      this::getSwerveXSpeed, this::getSwerveYSpeed, this::getSwerveRot));
+    private void registerDrivetrain() {
+        if (Config.Subsystems.DRIVETRAIN_ENABLED) {
+            System.out.println("Register Drivetrain");
+            var drivetrain = Drivetrain.getInstance();
+
+                var vision = Vision.getInstance();
+
+            //--- Drive ---
+            drivetrain.setDefaultCommand(drivetrain.driveCommand(this::getSwerveXSpeed, this::getSwerveYSpeed, this::getSwerveRot));
 
       //--- Arcing ---
       // if(DriverStation.getAlliance().get() == DriverStation.Alliance.Red){
@@ -63,20 +66,20 @@ public abstract class DriverMap extends CommandMap {
                       () -> Drivetrain.getInstance().getPose(),
                       () -> Drivetrain.getInstance().getFieldRelativeSpeed(),
                       () -> Drivetrain.getInstance().getFieldRelativeAccel()).getTranslation()));
+            getArcingButton().whileTrue(drivetrain.alignWhileDrivingCommand(this::getSwerveXSpeed, this::getSwerveYSpeed, getTarget));
 
-      
-      // getNavigateAndAllignAmpButton().whileTrue(drivetrain.pathFindThenFollowPathCommand(
-      //   "Go To Amp"));
+            // getNavigateAndAllignAmpButton().whileTrue(drivetrain.pathFindThenFollowPathCommand(
+            //   "Go To Amp"));
 
-      // getNavigateAndAllignAmpButton().whileTrue(drivetrain.pathFindThenFollowPathCommand("Go To Stage"));
-        
-      getFollowNoteButton().whileTrue(vision.PIDtoNoteRobotRelativeCommand());
-      getZeroGyroButton().onTrue(drivetrain.zeroYawCommand());
+            // getNavigateAndAllignAmpButton().whileTrue(drivetrain.pathFindThenFollowPathCommand("Go To Stage"));
+
+            getFollowNoteButton().whileTrue(vision.PIDtoNoteRobotRelativeCommand());
+            getZeroGyroButton().onTrue(drivetrain.zeroYawCommand());
+        }
     }
-  }
 
-  @Override
-  public void registerCommands() {
-    registerDrivetrain();
-  }
+    @Override
+    public void registerCommands() {
+        registerDrivetrain();
+    }
 }

@@ -1,15 +1,17 @@
 package frc.robot.subsystems;
 
+import java.util.Optional;
 import java.util.function.Supplier;
 
 import com.revrobotics.CANSparkBase;
 import com.revrobotics.CANSparkFlex;
-import com.revrobotics.SparkPIDController;
 import com.revrobotics.CANSparkBase.ControlType;
 import com.revrobotics.CANSparkBase.IdleMode;
 import com.revrobotics.CANSparkLowLevel.MotorType;
 
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.util.sendable.SendableBuilder;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.networktables.GenericEntry;
@@ -20,9 +22,9 @@ import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
-import frc.robot.Config;
 import frc.robot.RobotMap.Coordinates;
 import frc.robot.RobotMap.ShooterMap;
+import frc.robot.util.ActionSetpoint;
 import frc.robot.core.util.FieldRelative.FieldRelativeAccel;
 import frc.robot.core.util.FieldRelative.FieldRelativeSpeed;
 import frc.robot.util.FlywheelLookupTable;
@@ -54,14 +56,10 @@ public class Shooter extends SubsystemBase {
     /*
      * leaderFlywheel: TOP FLYWHEEL
      * followerFlywheel: BOTTOM FLYWHEEL
-     * leaderPIVOT: LEFT PIVOT
-     * followerPivot: RIGHT PIVOT
      */
-    private CANSparkBase top, bot;
-    private SparkPIDController topPID, botPID;
+    private Optional<CANSparkBase> top, bot;
 
     private double leadVel, followVel;
-
     private ShuffleboardTab tab = Shuffleboard.getTab("Shooter");
     private GenericEntry shooterAngleEntry = tab.add("Shooter Angle", 0).getEntry();
     private GenericEntry shooterRPMEntry = tab.add("Shooter RPM", 0).getEntry();
@@ -73,43 +71,47 @@ public class Shooter extends SubsystemBase {
    PoseEstimator poseEstimator = PoseEstimator.getInstance();
 
     private Shooter() {
+        super();
+
         if (ShooterMap.TOP_SHOOTER != -1) {
+            top = Optional.of(new CANSparkFlex(ShooterMap.TOP_SHOOTER, MotorType.kBrushless));
 
-            setName("Shooter");
-            top = new CANSparkFlex(ShooterMap.TOP_SHOOTER, MotorType.kBrushless);
-            top.setIdleMode(IdleMode.kCoast);
-            topPID = top.getPIDController();
-            topPID.setP(ShooterMap.FLYWHEEL_PID.kP);
-            topPID.setI(ShooterMap.FLYWHEEL_PID.kI);
-            topPID.setD(ShooterMap.FLYWHEEL_PID.kD);
-            topPID.setFF(ShooterMap.FLYWHEEL_FF);
+            var motor = top.get();
 
-            top.setClosedLoopRampRate(ShooterMap.FLYWHEEL_RAMP_RATE);
-            top.burnFlash();
+            motor.restoreFactoryDefaults();
 
-            var tab = Shuffleboard.getTab("Shooter");
+            motor.setIdleMode(IdleMode.kCoast);
+            var pid = motor.getPIDController();
+            pid.setP(ShooterMap.FLYWHEEL_PID.kP);
+            pid.setI(ShooterMap.FLYWHEEL_PID.kI);
+            pid.setD(ShooterMap.FLYWHEEL_PID.kD);
+            pid.setFF(ShooterMap.FLYWHEEL_FF);
 
-            tab.add(this);
-
+            motor.setClosedLoopRampRate(ShooterMap.FLYWHEEL_RAMP_RATE);
+            motor.burnFlash();
+        } else {
+            top = Optional.empty();
         }
+
         if (ShooterMap.BOTTOM_SHOOTER != -1) {
-            bot = new CANSparkFlex(ShooterMap.BOTTOM_SHOOTER, MotorType.kBrushless);
-            bot.setIdleMode(IdleMode.kCoast);
-            botPID = bot.getPIDController();
-            botPID.setP(ShooterMap.FLYWHEEL_PID.kP);
-            botPID.setI(ShooterMap.FLYWHEEL_PID.kI);
-            botPID.setD(ShooterMap.FLYWHEEL_PID.kD);
-            botPID.setFF(ShooterMap.FLYWHEEL_FF);
+            bot = Optional.of(new CANSparkFlex(ShooterMap.BOTTOM_SHOOTER, MotorType.kBrushless));
 
-            bot.setClosedLoopRampRate(ShooterMap.FLYWHEEL_RAMP_RATE);
-            bot.burnFlash();
+            var motor = bot.get();
+
+            motor.restoreFactoryDefaults();
+
+            motor.setIdleMode(IdleMode.kCoast);
+            var pid = motor.getPIDController();
+            pid.setP(ShooterMap.FLYWHEEL_PID.kP);
+            pid.setI(ShooterMap.FLYWHEEL_PID.kI);
+            pid.setD(ShooterMap.FLYWHEEL_PID.kD);
+            pid.setFF(ShooterMap.FLYWHEEL_FF);
+
+            motor.setClosedLoopRampRate(ShooterMap.FLYWHEEL_RAMP_RATE);
+            motor.burnFlash();
+        } else {
+            bot = Optional.empty();
         }
-
-        //initDefaultCommand();
-    }
-
-    public double getSetpoint() {
-        return top.getEncoder().getPosition();
     }
 
     public Command setFlywheelVelocityCommand(Supplier<Double> v) {
@@ -121,14 +123,17 @@ public class Shooter extends SubsystemBase {
     }
 
     public Command stopFlywheelCommand() {
-        return setFlywheelVelocityCommand(()->0.0);
+        return setFlywheelVelocityCommand(() -> 0.0);
     }
 
-    public boolean getFlywheelIsAtVelocity(){
-        return Math.abs(top.getEncoder().getVelocity() - leadVel) < ShooterMap.FLYWHEEL_VELOCITY_TOLERANCE
-            && Math.abs(bot.getEncoder().getVelocity() - followVel) < ShooterMap.FLYWHEEL_VELOCITY_TOLERANCE;
+    public boolean getFlywheelIsAtVelocity() {
+        if (top.isEmpty() || bot.isEmpty())
+            return false;
+      
+        return Math.abs(top.get().getEncoder().getVelocity() - leadVel) < ShooterMap.FLYWHEEL_VELOCITY_TOLERANCE
+                && Math.abs(bot.get().getEncoder().getVelocity() - followVel) < ShooterMap.FLYWHEEL_VELOCITY_TOLERANCE;
     }
-
+  
     public Pose2d findIdealTarget(Supplier<Pose2d> robotPose, Supplier<FieldRelativeSpeed> robotVel,
                                   Supplier<FieldRelativeAccel> robotAccel) {
         Translation2d target = Config.IS_ALLIANCE_BLUE ? Coordinates.BLUE_SPEAKER.getTranslation() : Coordinates.RED_SPEAKER.getTranslation();
@@ -195,33 +200,41 @@ public class Shooter extends SubsystemBase {
         Config.Subsystems.SHOOT_MOVING = shoot_moving.get().getBoolean();
     }
 
-    // public void initDefaultCommand() {
-    //     setDefaultCommand(this.setFlywheelVelocityCommand(()->lookupTable.get(
-    //         poseEstimator.getDistanceToPose(target.getTranslation())).getRPM()));
-    // }
-
     private void updateMotors() {
-        if (top != null) {
+        if (top.isPresent()) {
             if (leadVel != 0) {
-                topPID.setReference(leadVel, ControlType.kVelocity);
+                top.get().getPIDController().setReference(leadVel, ControlType.kVelocity);
             } else
-                top.set(0);
+                top.get().set(0);
         }
-        if (bot != null) {
+        if (bot.isPresent()) {
             if (followVel != 0) {
-                botPID.setReference(followVel, ControlType.kVelocity);
+                bot.get().getPIDController().setReference(followVel, ControlType.kVelocity);
             } else
-                bot.set(0);
+                bot.get().set(0);
         }
     }
 
     @Override
     public void initSendable(SendableBuilder builder) {
+        super.initSendable(builder);
+
         builder.addDoubleProperty("lead velocity", () -> leadVel, (v) -> leadVel = v);
         builder.addDoubleProperty("follow velocity", () -> followVel, (v) -> followVel = v);
-        builder.addDoubleProperty("real top velo", () -> top.getEncoder().getVelocity(), (d) -> {
+        builder.addDoubleProperty("real top velo",
+                () -> top.map(motor -> motor.getEncoder().getVelocity()).orElse(0.0),
+                (d) -> {}
+        );
+        builder.addDoubleProperty("real bot velo",
+                () -> bot.map(motor -> motor.getEncoder().getVelocity()).orElse(0.0),
+                (d) -> {}
+        );
+
+        Supplier<ActionSetpoint> getSetpoint = () -> lookupTable.get(poseEstimator.getDistanceToPose(target.get().getTranslation()));
+
+        builder.addDoubleProperty("lookup rpm", () -> getSetpoint.get().getRPM(), (d) -> {
         });
-        builder.addDoubleProperty("real bottom velo", () -> bot.getEncoder().getVelocity(), (d) -> {
+        builder.addDoubleProperty("lookup angle", () -> getSetpoint.get().getAngle(), (d) -> {
         });
     }
 
