@@ -12,6 +12,7 @@ public class Config {
     public static final boolean DRIVETRAIN_ENABLED = true;
     public static final boolean CLIMBER_ENABLED = false;
     public static final boolean SHOOTER_ENABLED = true;
+    public static boolean SHOOT_MOVING = false;
 
     public static final class Intake {
       public static final boolean INTAKE_ENABLED = true;

@@ -10,8 +10,11 @@ import com.revrobotics.CANSparkBase.IdleMode;
 import com.revrobotics.CANSparkLowLevel.MotorType;
 
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.networktables.GenericEntry;
 import edu.wpi.first.util.sendable.SendableBuilder;
+import edu.wpi.first.wpilibj.shuffleboard.BuiltInWidgets;
 import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
 import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -20,6 +23,8 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Config;
 import frc.robot.RobotMap.Coordinates;
 import frc.robot.RobotMap.ShooterMap;
+import frc.robot.core.util.FieldRelative.FieldRelativeAccel;
+import frc.robot.core.util.FieldRelative.FieldRelativeSpeed;
 import frc.robot.util.FlywheelLookupTable;
 
 /**
@@ -60,10 +65,11 @@ public class Shooter extends SubsystemBase {
     private ShuffleboardTab tab = Shuffleboard.getTab("Shooter");
     private GenericEntry shooterAngleEntry = tab.add("Shooter Angle", 0).getEntry();
     private GenericEntry shooterRPMEntry = tab.add("Shooter RPM", 0).getEntry();
+    private GenericEntry shoot_moving = tab.add("Shoot Moving?", Config.Subsystems.SHOOT_MOVING).withWidget(BuiltInWidgets.kBooleanBox).getEntry();
 
     FlywheelLookupTable lookupTable = FlywheelLookupTable.getInstance();
    // Pose2d target = DriverStation.getAlliance().equals(DriverStation.Alliance.Blue) ? Coordinates.BLUE_SPEAKER : Coordinates.RED_SPEAKER;
-    Pose2d target = Config.IS_ALLIANCE_BLUE ? Coordinates.BLUE_SPEAKER : Coordinates.RED_SPEAKER;
+   Pose2d target = Config.IS_ALLIANCE_BLUE ? Coordinates.BLUE_SPEAKER : Coordinates.RED_SPEAKER;
    PoseEstimator poseEstimator = PoseEstimator.getInstance();
 
     private Shooter() {
@@ -123,19 +129,70 @@ public class Shooter extends SubsystemBase {
             && Math.abs(bot.getEncoder().getVelocity() - followVel) < ShooterMap.FLYWHEEL_VELOCITY_TOLERANCE;
     }
 
+    public Pose2d findIdealTarget(Supplier<Pose2d> robotPose, Supplier<FieldRelativeSpeed> robotVel,
+                                  Supplier<FieldRelativeAccel> robotAccel) {
+        Translation2d target = Config.IS_ALLIANCE_BLUE ? Coordinates.BLUE_SPEAKER.getTranslation() : Coordinates.RED_SPEAKER.getTranslation();
+        Rotation2d speakerRot = target.getAngle();
 
+        if (!Config.Subsystems.SHOOT_MOVING) {
+            return new Pose2d(target, speakerRot);
+        }
+
+        double dist = target.getDistance(robotPose.get().getTranslation());
+
+        //fix with new lookup table that has shot time
+        double shotTime = lookupTable.get(dist).getShotTime();
+
+        //time inside bot after shot
+        double feedTime = lookupTable.get(dist).getFeedTime();
+
+        Translation2d movingGoalLocation = new Translation2d();
+
+        for(int i=0;i<5;i++){
+
+            double virtualGoalX = target.getX()
+                    - shotTime * (robotVel.get().vx + robotAccel.get().ax * feedTime);
+            double virtualGoalY = target.getY()
+                    - shotTime * (robotVel.get().vy + robotAccel.get().ay * feedTime);
+
+            Translation2d testGoalLocation = new Translation2d(virtualGoalX, virtualGoalY);
+
+            dist = testGoalLocation.getDistance(robotPose.get().getTranslation());
+
+            double newShotTime = lookupTable.get(dist).getShotTime();
+
+            feedTime = lookupTable.get(dist).getFeedTime();
+
+            if(Math.abs(newShotTime-shotTime) <= 0.010){
+                i=4;
+            }
+
+            if(i == 4){
+                movingGoalLocation = testGoalLocation;
+            }
+            else{
+                shotTime = newShotTime;
+            }
+
+        }
+
+        return new Pose2d(movingGoalLocation, speakerRot);
+
+    }
 
     @Override
     public void periodic() {
+        findIdealTarget(() -> Drivetrain.getInstance().getPose(), () -> Drivetrain.getInstance().getFieldRelativeSpeed(),
+                () -> Drivetrain.getInstance().getFieldRelativeAccel());
         updateMotors();
         shooterRPMEntry.setDouble(lookupTable.get(
-            poseEstimator.getDistanceToPose(target.getTranslation())).getRPM());
+                poseEstimator.getDistanceToPose(target.getTranslation())).getRPM());
         FlywheelLookupTable lookupTable = FlywheelLookupTable.getInstance();
-    //   Pose2d target = (DriverStation.getAlliance().get() == DriverStation.Alliance.Blue) ? Coordinates.BLUE_SPEAKER : Coordinates.RED_SPEAKER;
-        Pose2d target = Config.IS_ALLIANCE_BLUE ? Coordinates.BLUE_SPEAKER : Coordinates.RED_SPEAKER;
+        //   Pose2d target = (DriverStation.getAlliance().get() == DriverStation.Alliance.Blue) ? Coordinates.BLUE_SPEAKER : Coordinates.RED_SPEAKER;
         PoseEstimator poseEstimator = PoseEstimator.getInstance();
         shooterAngleEntry.setDouble(lookupTable
-        .get(poseEstimator.getDistanceToPose(target.getTranslation())).getAngleSetpoint());
+                .get(poseEstimator.getDistanceToPose(target.getTranslation())).getAngleSetpoint());
+        Config.Subsystems.SHOOT_MOVING = shoot_moving.get().getBoolean();
     }
 
     // public void initDefaultCommand() {

@@ -4,10 +4,13 @@ import static frc.robot.core.TalonSwerve.SwerveConstants.*;
 
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj2.command.*;
 import frc.robot.RobotMap.DriveMap;
 import frc.robot.core.MAXSwerve.MAXSwerve;
 import frc.robot.core.MAXSwerve.MAXSwerveModule;
+import frc.robot.core.util.FieldRelative.FieldRelativeAccel;
+import frc.robot.core.util.FieldRelative.FieldRelativeSpeed;
 
 /**
  * <b>Use {@link #getInstance()} to access all subsystems.</b><br>
@@ -31,6 +34,9 @@ import frc.robot.core.MAXSwerve.MAXSwerveModule;
  */
 public class Drivetrain extends MAXSwerve {
   private static Drivetrain instance;
+  private FieldRelativeSpeed fieldRelativeSpeed = new FieldRelativeSpeed();
+  private FieldRelativeSpeed last_fieldRelativeSpeed = new FieldRelativeSpeed();
+  private FieldRelativeAccel fieldRelativeAccel = new FieldRelativeAccel();
 
   /**
    * <b>Use this to access the subsystem using its static instance.</b><br>
@@ -152,5 +158,21 @@ public class Drivetrain extends MAXSwerve {
   @Override
   public void periodic() {
     super.periodic();
+
+    fieldRelativeSpeed = new FieldRelativeSpeed(super.getChassisSpeeds(), new Rotation2d(super.getGyroYawDegrees()));
+    fieldRelativeAccel = new FieldRelativeAccel(fieldRelativeSpeed, last_fieldRelativeSpeed, 0.02);
+    last_fieldRelativeSpeed = fieldRelativeSpeed;
+  }
+
+  public FieldRelativeAccel getFieldRelativeAccel() {
+    return fieldRelativeAccel;
+  }
+
+  public FieldRelativeSpeed getFieldRelativeSpeed() {
+    return fieldRelativeSpeed;
+  }
+
+  public FieldRelativeSpeed getLast_fieldRelativeSpeed() {
+    return last_fieldRelativeSpeed;
   }
 }

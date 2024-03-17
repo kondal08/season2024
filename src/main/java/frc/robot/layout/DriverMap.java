@@ -6,6 +6,7 @@ import frc.robot.RobotMap.Coordinates;
 import frc.robot.core.util.controllers.CommandMap;
 import frc.robot.core.util.controllers.GameController;
 import frc.robot.subsystems.Drivetrain;
+import frc.robot.subsystems.Shooter;
 import frc.robot.subsystems.Vision.Vision;
 
 public abstract class DriverMap extends CommandMap {
@@ -57,15 +58,11 @@ public abstract class DriverMap extends CommandMap {
       //   getArcingButton().whileTrue(drivetrain.alignWhileDrivingCommand(
       //         this::getSwerveXSpeed,this::getSwerveYSpeed, () -> Coordinates.BLUE_SPEAKER.getTranslation()));
       // }
-
-      if(Config.IS_ALLIANCE_RED){
-        getArcingButton().whileTrue(drivetrain.alignWhileDrivingCommand(
-              this::getSwerveXSpeed,this::getSwerveYSpeed, () -> Coordinates.RED_SPEAKER.getTranslation()));
-      }
-      else{
-        getArcingButton().whileTrue(drivetrain.alignWhileDrivingCommand(
-              this::getSwerveXSpeed,this::getSwerveYSpeed, () -> Coordinates.BLUE_SPEAKER.getTranslation()));
-      }
+      getArcingButton().whileTrue(drivetrain.alignWhileDrivingCommand(
+              this::getSwerveXSpeed,this::getSwerveYSpeed, () -> Shooter.getInstance().findIdealTarget(
+                      () -> Drivetrain.getInstance().getPose(),
+                      () -> Drivetrain.getInstance().getFieldRelativeSpeed(),
+                      () -> Drivetrain.getInstance().getFieldRelativeAccel()).getTranslation()));
 
       
       // getNavigateAndAllignAmpButton().whileTrue(drivetrain.pathFindThenFollowPathCommand(

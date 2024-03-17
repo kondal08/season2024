@@ -129,9 +129,13 @@ public abstract class OperatorMap extends CommandMap {
       //   getIntakeButton().onTrue(new RunCommand(() -> intake.setIntakeState(IntakeDirection.STOPPED), intake));
       getIntakeButton().onTrue(new IntakeUntilLoadedCommand());
       getArcButton().whileTrue((pivot.updatePosition(() -> lookupTable
-      .get(poseEstimator.getDistanceToPose(target.getTranslation())).getAngleSetpoint()).alongWith( 
-      shooter.setFlywheelVelocityCommand(() -> lookupTable.get(
-        poseEstimator.getDistanceToPose(target.getTranslation())).getRPM()))));
+              .get(poseEstimator.getDistanceToPose(Shooter.getInstance().findIdealTarget(() -> Drivetrain.getInstance().getPose(),
+                      () -> Drivetrain.getInstance().getFieldRelativeSpeed(),
+                      () -> Drivetrain.getInstance().getFieldRelativeAccel()).getTranslation())).getAngleSetpoint()).alongWith(
+              shooter.setFlywheelVelocityCommand(() -> lookupTable.get(
+                      poseEstimator.getDistanceToPose(Shooter.getInstance().findIdealTarget(() -> Drivetrain.getInstance().getPose(),
+                              () -> Drivetrain.getInstance().getFieldRelativeSpeed(),
+                              () -> Drivetrain.getInstance().getFieldRelativeAccel()).getTranslation())).getRPM()))));
       getArcButton().onFalse(shooter.setFlywheelVelocityCommand(() -> 0.0).alongWith(pivot.updatePosition(() -> -1.0)));
 
       getAmpAlignButton().onTrue(
