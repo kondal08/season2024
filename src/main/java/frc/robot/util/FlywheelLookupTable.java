@@ -3,30 +3,11 @@ package frc.robot.util;
 import edu.wpi.first.math.interpolation.InterpolatingDoubleTreeMap;
 
 public class FlywheelLookupTable {
-    private static FlywheelLookupTable instance;
-
-    public static FlywheelLookupTable getInstance() {
-        if (instance == null)
-            instance = new FlywheelLookupTable();
-        return instance;
-    }
-
     private InterpolatingDoubleTreeMap distanceToRPM, distanceToAngleSetpoint, distanceToShotTime, distanceToFeedTime;
     
 
     // Distance (meters), rpm, angleSetpoint
-    private double[][] lookupTable = {
-            { 1, 2600,-115-10, 0.0, 0.0},
-            { 1.45, 2600, -87-10, 0.0, 0.0},
-            { 1.95, 2600, -67, 0.0, 0.0},
-            { 2.47, 3000, -52+5, 0.0, 0.0},
-            //  { 2.49, 3700, -52- 12},
-            //  { 2.90, 3800, -52- 12},
-            //  { 2.96, 4000, -30 - 12},
-            { 3.48, 4000, -19 +5, 0.0, 0.0},
-            { 3.95, 4050, -10 +5, 0.0, 0.0},
-            { 4.43, 4200, -4, 0.0, 0.0}
-    };
+    private double[][] lookupTable;
 
 /*
  *  { 0.815, 2400,-115},
@@ -40,11 +21,12 @@ public class FlywheelLookupTable {
     
  */
 
-    private FlywheelLookupTable() {
+    public FlywheelLookupTable(double[][] lookupTable) {
         distanceToRPM = new InterpolatingDoubleTreeMap();
         distanceToAngleSetpoint = new InterpolatingDoubleTreeMap();
         distanceToShotTime = new InterpolatingDoubleTreeMap();
         distanceToFeedTime = new InterpolatingDoubleTreeMap();
+        this.lookupTable = lookupTable;
 
         createShootMap(lookupTable);
     }
