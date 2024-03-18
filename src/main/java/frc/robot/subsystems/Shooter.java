@@ -22,6 +22,8 @@ import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardTab;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.Config;
+import frc.robot.RobotMap;
 import frc.robot.RobotMap.Coordinates;
 import frc.robot.RobotMap.ShooterMap;
 import frc.robot.util.ActionSetpoint;
@@ -65,10 +67,10 @@ public class Shooter extends SubsystemBase {
     private GenericEntry shooterRPMEntry = tab.add("Shooter RPM", 0).getEntry();
     private GenericEntry shoot_moving = tab.add("Shoot Moving?", Config.Subsystems.SHOOT_MOVING).withWidget(BuiltInWidgets.kBooleanBox).getEntry();
 
-    FlywheelLookupTable lookupTable = FlywheelLookupTable.getInstance();
+    private FlywheelLookupTable lookupTable = ShooterMap.SHOT_LOOKUP_TABLE;
    // Pose2d target = DriverStation.getAlliance().equals(DriverStation.Alliance.Blue) ? Coordinates.BLUE_SPEAKER : Coordinates.RED_SPEAKER;
-   Pose2d target = Config.IS_ALLIANCE_BLUE ? Coordinates.BLUE_SPEAKER : Coordinates.RED_SPEAKER;
-   PoseEstimator poseEstimator = PoseEstimator.getInstance();
+   private Pose2d target = Config.IS_ALLIANCE_BLUE ? Coordinates.BLUE_SPEAKER : Coordinates.RED_SPEAKER;
+   private PoseEstimator poseEstimator = PoseEstimator.getInstance();
 
     private Shooter() {
         super();
@@ -136,14 +138,14 @@ public class Shooter extends SubsystemBase {
   
     public Pose2d findIdealTarget(Supplier<Pose2d> robotPose, Supplier<FieldRelativeSpeed> robotVel,
                                   Supplier<FieldRelativeAccel> robotAccel) {
-        Translation2d target = Config.IS_ALLIANCE_BLUE ? Coordinates.BLUE_SPEAKER.getTranslation() : Coordinates.RED_SPEAKER.getTranslation();
-        Rotation2d speakerRot = target.getAngle();
+        Translation2d targetTranslation = target.getTranslation();
+        Rotation2d speakerRot = target.getRotation();
 
         if (!Config.Subsystems.SHOOT_MOVING) {
-            return new Pose2d(target, speakerRot);
+            return target;
         }
 
-        double dist = target.getDistance(robotPose.get().getTranslation());
+        double dist = targetTranslation.getDistance(robotPose.get().getTranslation());
 
         //fix with new lookup table that has shot time
         double shotTime = lookupTable.get(dist).getShotTime();
@@ -155,9 +157,9 @@ public class Shooter extends SubsystemBase {
 
         for(int i=0;i<5;i++){
 
-            double virtualGoalX = target.getX()
+            double virtualGoalX = targetTranslation.getX()
                     - shotTime * (robotVel.get().vx + robotAccel.get().ax * feedTime);
-            double virtualGoalY = target.getY()
+            double virtualGoalY = targetTranslation.getY()
                     - shotTime * (robotVel.get().vy + robotAccel.get().ay * feedTime);
 
             Translation2d testGoalLocation = new Translation2d(virtualGoalX, virtualGoalY);
@@ -187,16 +189,16 @@ public class Shooter extends SubsystemBase {
 
     @Override
     public void periodic() {
-        findIdealTarget(() -> Drivetrain.getInstance().getPose(), () -> Drivetrain.getInstance().getFieldRelativeSpeed(),
+        Pose2d target = findIdealTarget(() -> Drivetrain.getInstance().getPose(), () -> Drivetrain.getInstance().getFieldRelativeSpeed(),
                 () -> Drivetrain.getInstance().getFieldRelativeAccel());
         updateMotors();
         shooterRPMEntry.setDouble(lookupTable.get(
                 poseEstimator.getDistanceToPose(target.getTranslation())).getRPM());
-        FlywheelLookupTable lookupTable = FlywheelLookupTable.getInstance();
+        FlywheelLookupTable lookupTable = ShooterMap.SHOT_LOOKUP_TABLE;
         //   Pose2d target = (DriverStation.getAlliance().get() == DriverStation.Alliance.Blue) ? Coordinates.BLUE_SPEAKER : Coordinates.RED_SPEAKER;
         PoseEstimator poseEstimator = PoseEstimator.getInstance();
         shooterAngleEntry.setDouble(lookupTable
-                .get(poseEstimator.getDistanceToPose(target.getTranslation())).getAngleSetpoint());
+                .get(poseEstimator.getDistanceToPose(target.getTranslation())).getAngle());
         Config.Subsystems.SHOOT_MOVING = shoot_moving.get().getBoolean();
     }
 
@@ -230,7 +232,7 @@ public class Shooter extends SubsystemBase {
                 (d) -> {}
         );
 
-        Supplier<ActionSetpoint> getSetpoint = () -> lookupTable.get(poseEstimator.getDistanceToPose(target.get().getTranslation()));
+        Supplier<ActionSetpoint> getSetpoint = () -> lookupTable.get(poseEstimator.getDistanceToPose(target.getTranslation()));
 
         builder.addDoubleProperty("lookup rpm", () -> getSetpoint.get().getRPM(), (d) -> {
         });
