@@ -7,6 +7,7 @@ import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
+import frc.robot.util.FlywheelLookupTable;
 
 public class RobotMap {
   public enum PoseMap {
@@ -230,7 +231,35 @@ public class RobotMap {
     public static final double FLYWHEEL_FF = 0.00015;
     public static final double FLYWHEEL_RAMP_RATE = 0.5;
 
-  }
+    public static final double[][] SHOT_LOOKUP_TABLE_VALUES =
+            // Distance (meters), rpm, angleSetpoint, shot time, feed time
+            {{ 1.45, 2600, -87-10, 0.0, 0.0},
+            { 1.95, 2600, -67, 0.0, 0.0},
+            { 2.47, 3000, -52+5, 0.0, 0.0},
+    //  { 2.49, 3700, -52- 12},
+    //  { 2.90, 3800, -52- 12},
+    //  { 2.96, 4000, -30 - 12},
+            { 3.48, 4000, -19 +5, 0.0, 0.0},
+            { 3.95, 4050, -10 +5, 0.0, 0.0},
+            { 4.43, 4200, -4, 0.0, 0.0}};
+
+  public static final FlywheelLookupTable SHOT_LOOKUP_TABLE = new FlywheelLookupTable(SHOT_LOOKUP_TABLE_VALUES);
+
+  public static final double[][] FERRY_LOOKUP_TABLE_VALUES =
+                  // Distance (meters), rpm, angleSetpoint, shot time, feed time
+                  {{ 1.45, 2600, -87-10, 0.0, 0.0},
+                  { 1.95, 2600, -67, 0.0, 0.0},
+                  { 2.47, 3000, -52+5, 0.0, 0.0},
+                  //  { 2.49, 3700, -52- 12},
+                  //  { 2.90, 3800, -52- 12},
+                  //  { 2.96, 4000, -30 - 12},
+                  { 3.48, 4000, -19 +5, 0.0, 0.0},
+                  { 3.95, 4050, -10 +5, 0.0, 0.0},
+                  { 4.43, 4200, -4, 0.0, 0.0}};
+
+    public static final FlywheelLookupTable FERRY_LOOKUP_TABLE = new FlywheelLookupTable(FERRY_LOOKUP_TABLE_VALUES);
+
+}
 
   public static class FeederMap {
     public static final int FEEDER = 10;
